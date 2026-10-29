@@ -1065,7 +1065,7 @@ function drawOpts(){neonBg();const m=optMode,cx=W/2,bw=Math.min(320,W-50);txt(m.
  if(m.two){y+=6;txt('2 PLAYERS · SAME PHONE',cx,y+6,20,'#8ef56a');y+=30;const lk=locked(m.id,true,0);btn('two',cx-bw/2,y,bw,56,(lk?'🔒 ':'')+(m.simul?'PLAYER 1 vs PLAYER 2':'P1 vs P2 · TAKE TURNS'),()=>startMode(m.id,{two:true}),{col:'#9b4bc0',sz:19});y+=62;
   para(!m.simul?'Player 1 plays a full round, then passes the phone to Player 2. High score wins.':LY.portrait?'Player 2 holds the top of the phone: each player gets their own pad.':'Player 1 uses the left pad, Player 2 the right pad.',cx,y+8,16,'#e6dcff',W-40);y+=48}
  btn('back',16,H-70,120,52,'◀ BACK',()=>{state='modes'},{col:'#4a3a6a',sz:18})}
-function drawHelp(){neonBg();const cx=W/2,mw=Math.min(W-40,520),pages=[{name:'Controls',help:['D-pad: move, dance and duck. Slide your thumb to change direction.','A: jump / dodge.   B: attack / bop / action.','Keyboard: arrows or WASD, Space/Z = A, X/J = B, P = pause, M = mute.','2 players on a keyboard: P1 = WASD + F (A) + G (B), P2 = arrows + K (A) + L (B).']},...MODES.filter(m=>!m.soon)];const p=pages[helpPage];
+function drawHelp(){neonBg();const cx=W/2,mw=Math.min(W-40,520),pages=[{name:'Controls',help:['D-pad: move, dance and duck. Slide your thumb to change direction.','A: jump / dodge.   B: attack / bop / action.','Keyboard: arrows or WASD, Space/Z = A, X/J = B, P = pause, M = mute.','2 players on a keyboard: P1 = WASD + F (A) + G (B), P2 = arrows + K (A) + L (B).','🎮 Controller (USB or Bluetooth, computer or paired to your phone): stick/D-pad move, A jump/dodge, B or X attack, Start pause, Select sound. Menus: D-pad + A, B goes back.']},...MODES.filter(m=>!m.soon)];const p=pages[helpPage];
  txt('HOW TO PLAY',cx,46,28,'#ffe14a','center',{stroke:5,sc:'#3a0050'});txt(p.name,cx,90,fit(p.name,24,W-40),'#20f0ff','center',{stroke:4});let y=130;
  for(const h of p.help){y=para('• '+h,cx,y,18,'#fff',mw)+12}
  txt((helpPage+1)+' / '+pages.length,cx,H-150,18,'#cfc8e8');
@@ -1382,4 +1382,31 @@ window.PALB=api})();
 #palbTabs button{min-height:48px!important;font-size:16px!important}
 #palbList li{min-height:30px;height:auto!important;font-size:16px!important}
 </style>
+<!-- gamepad:start -->
+<script src="gamepad.js?v=2"></script>
+<script>
+(function(){
+function ov(){return !!document.querySelector('#palbOv.on,#smpLock.on')}
+function k(n){return function(p){if(state!=='play'||paused)return;keys[0][n]=p?1:0;recompute()}}
+GamepadSupport.init({
+ keys:{left:k('l'),right:k('r'),up:k('u'),down:k('d'),a:k('a'),b:k('b'),x:k('b'),rt:k('b'),
+  start:function(p){if(p&&state==='play')togglePause()},
+  back:function(p){if(p)toggleMute()}},
+ noRepeat:['start','back'],repeat:false,
+ ignoreSel:'#dock,#mute,#inst,#ios,.tb,#dockHint,#smpBack',
+ menu:function(){return ov()||state!=='play'||paused},
+ items:GamepadSupport.list(function(){if(ov())return [];return menuBtns.filter(function(b){return !b.off&&!(state==='play'&&!paused&&/^(pause|mute)$/.test(b.id))}).sort(function(a,b){return (b.def?1:0)-(a.def?1:0)})},{scale:1}),
+ isPaused:function(){return state==='play'&&paused},
+ pause:function(){if(state==='play'&&!paused)togglePause()},
+ onDisconnect:function(wasPlay){if(wasPlay&&state==='play'&&!paused)togglePause()},
+ back:function(){if(ov())return false;
+  if(state==='play'&&paused){togglePause();return true}
+  if(state==='help'||state==='modes'){toTitle();return true}
+  if(state==='opts'){state='modes';return true}
+  return true;},
+ hint:{text:'🎮 Controller: stick/D-pad move · A jump/dodge · B or X attack · Start pause',when:function(){return state==='title'&&!ov()}}
+});
+})();
+</script>
+<!-- gamepad:end -->
 </body></html>
