@@ -77,23 +77,35 @@ let IN=[NOI(),NOI()],PREV=[NOI(),NOI()],keys=[NOI(),NOI()],ptrs=new Map(),downBt
 function vib(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
 function padDirs(P,x,y,rot){let dx=x-P.cx,dy=y-P.cy;if(rot){dx=-dx;dy=-dy}const ax=Math.abs(dx),ay=Math.abs(dy),o=[];if(Math.hypot(dx,dy)<P.a*.3)return o;const T=2.414;if(ax>ay/T)o.push(dx>0?'r':'l');if(ay>ax/T)o.push(dy>0?'d':'u');return o}
 function onPad(P,x,y){const h=P.a*1.5+14;return Math.abs(x-P.cx)<=h&&Math.abs(y-P.cy)<=h}
+// no D-pad (Peter 10/29): swipe and hold anywhere on your side to move (direction = from where your finger landed, 8-way, stops on release);
+// a quick swipe up = A (jump / hop / dodge); swipe up and hold = up (dance / high / aim up); swipe down and hold = duck / low
+function swipeOwner(x,y){const n=LY.pads.length;if(n<2)return 0;return LY.portrait?(y<H/2?1:0):(x<W/2?0:1)}
+function swDirs(q,x,y,rot){let dx=x-q.x0,dy=y-q.y0;if(rot){dx=-dx;dy=-dy}const d=Math.hypot(dx,dy),R=64;
+ if(d>R){const k=(d-R)/d,sx=(x-q.x0)*k,sy=(y-q.y0)*k;q.x0+=sx;q.y0+=sy;dx*=R/d;dy*=R/d}
+ const ax=Math.abs(dx),ay=Math.abs(dy),o=[];if(Math.hypot(dx,dy)<16)return o;const T=2.414;if(ax>ay/T)o.push(dx>0?'r':'l');if(ay>ax/T)o.push(dy>0?'d':'u');return o}
+let PULSE=[0,0];function pulseA(i){PULSE[i]=performance.now()+130;recompute();setTimeout(recompute,140)}
 function abAt(pd,x,y,pad=12){const o=[];for(const k of ['b','a']){const q=pd.ab[k];if(Math.hypot(x-q.cx,y-q.cy)<=q.r+pad)o.push(k)}return o}
 function inR(r,x,y,m=0){return r&&x>=r.x-m&&x<=r.x+r.w+m&&y>=r.y-m&&y<=r.y+r.h+m}
 function padsActive(){return !!(G&&(state==='play'||state==='vs'))}
 function recompute(){const h=[NOI(),NOI()];for(const q of ptrs.values()){if(q.pl==null)continue;const o=h[q.pl];if(q.pad)for(const k of q.pad)o[k]=1;if(q.ab)for(const k of q.ab)o[k]=1}
+ const now=performance.now();for(const i of [0,1])if(PULSE[i]>now)h[i].a=1;
  for(const i of [0,1])for(const k in h[i]){h[i][k]=h[i][k]||keys[i][k];if(h[i][k]&&!IN[i][k]&&ptrs.size)vib(8)}IN=h}
-function resetInput(){ptrs.clear();keys=[NOI(),NOI()];downBtn=null;recompute()}
+function resetInput(){ptrs.clear();keys=[NOI(),NOI()];downBtn=null;PULSE=[0,0];recompute()}
 cv.addEventListener('pointerdown',e=>{au();const x=e.clientX,y=e.clientY;try{cv.setPointerCapture(e.pointerId)}catch(_){}
- if(padsActive()&&!paused){for(let i=0;i<LY.pads.length;i++){const pd=LY.pads[i];if(onPad(pd.pad,x,y)){ptrs.set(e.pointerId,{pl:i,pad:padDirs(pd.pad,x,y,pd.rot)});recompute();return}
-   const ab=abAt(pd,x,y);if(ab.length){ptrs.set(e.pointerId,{pl:i,ab});recompute();if(state==='vs'&&ab.includes('a'))vsGo();return}
-   if(inR(pd.panel,x,y)||inR(pd.panel2,x,y)){ptrs.set(e.pointerId,{dead:1});return}}}
+ if(padsActive()&&!paused){for(let i=0;i<LY.pads.length;i++){const pd=LY.pads[i];
+   const ab=abAt(pd,x,y);if(ab.length){ptrs.set(e.pointerId,{pl:i,ab});recompute();if(state==='vs'&&ab.includes('a'))vsGo();return}}
+  const sb=[...menuBtns].reverse().find(b=>!b.off&&inR(b,x,y,4));if(sb){downBtn=sb;ptrs.set(e.pointerId,{btn:sb});return}
+  ptrs.set(e.pointerId,{pl:swipeOwner(x,y),pad:[],sw:1,x0:x,y0:y,sx:x,sy:y,t0:performance.now(),x,y});recompute();return}
  const b=[...menuBtns].reverse().find(b=>!b.off&&inR(b,x,y,4));if(b){downBtn=b;ptrs.set(e.pointerId,{btn:b});return}
  ptrs.set(e.pointerId,{tap:1,x,y});});
 cv.addEventListener('pointermove',e=>{const q=ptrs.get(e.pointerId);if(!q||q.dead||q.pl==null)return;const pd=LY.pads[q.pl],x=e.clientX,y=e.clientY;
- if(q.pad){const d=padDirs(pd.pad,x,y,pd.rot);if(d.join()!=q.pad.join()){q.pad=d;recompute()}}else if(q.ab){const b=abAt(pd,x,y,16);if(b.length&&b.join()!=q.ab.join()){q.ab=b;recompute()}}});
+ if(q.sw){q.x=x;q.y=y;const d=swDirs(q,x,y,pd.rot);if(d.join()!=q.pad.join()){q.pad=d;recompute()}}else if(q.pad){const d=padDirs(pd.pad,x,y,pd.rot);if(d.join()!=q.pad.join()){q.pad=d;recompute()}}else if(q.ab){const b=abAt(pd,x,y,16);if(b.length&&b.join()!=q.ab.join()){q.ab=b;recompute()}}});
 function ptrEnd(e){const q=ptrs.get(e.pointerId);if(!q)return;ptrs.delete(e.pointerId);
  if(q.btn){const b=q.btn;downBtn=null;if(e.type==='pointerup'&&inR(b,e.clientX,e.clientY,10)){sfx('click');b.fn()}}
- else if(q.tap&&e.type==='pointerup')tapAt(q.x,q.y);recompute()}
+ else if(q.tap&&e.type==='pointerup')tapAt(q.x,q.y);
+ else if(q.sw&&e.type==='pointerup'){const pd=LY.pads[q.pl]||{};let dx=e.clientX-q.sx,dy=e.clientY-q.sy;if(pd.rot){dx=-dx;dy=-dy}const dt=performance.now()-q.t0;
+  if(dt<300&&dy<-24&&Math.abs(dy)>Math.abs(dx)*.8){if(state==='vs')vsGo();else pulseA(q.pl)}else if(Math.hypot(dx,dy)<14)tapAt(e.clientX,e.clientY)}
+ recompute()}
 cv.addEventListener('pointerup',ptrEnd);cv.addEventListener('pointercancel',ptrEnd);
 cv.addEventListener('lostpointercapture',e=>{if(ptrs.has(e.pointerId)){const q=ptrs.get(e.pointerId);ptrs.delete(e.pointerId);if(q.btn)downBtn=null;recompute()}});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
@@ -896,7 +908,7 @@ function drawPinGame(){const Q=G,FL=LY.field,k=Math.min(FL.w/236,FL.h/205),ox=FL
  txt(G.two?turnTag():'PEEK '+(Q.peeks?'◉':'○'),FL.x+FL.w-160,ty+36,16,G.two?(G.pl?'#8ef56a':'#ff9ad5'):'#20f0ff','left');
  if(Q.phase==='show')txt('MEMORIZE THE ✕!',FL.x+FL.w/2,sy(PT.y1)+26,fit('MEMORIZE THE ✕!',24,FL.w-20),'#ffe14a','center',{stroke:5,sc:'#ff2bd6'});
  if(Q.phase==='spin')txt('SPIN SPIN SPIN!',FL.x+FL.w/2,FL.y+FL.h*.45,fit('SPIN SPIN SPIN!',36,FL.w-20),'#ffe14a','center',{stroke:6,sc:'#ff2bd6'});
- if(Q.phase==='aim'&&Q.n===0&&Q.pt<3)txt('D-pad: steer · B: pin it · A: peek',FL.x+FL.w/2,sy(PT.y1)+52,fit('D-pad: steer · B: pin it · A: peek',16,FL.w-20),'#fff','center',{stroke:3});
+ if(Q.phase==='aim'&&Q.n===0&&Q.pt<3)txt('Swipe to steer · B: pin it · A: peek',FL.x+FL.w/2,sy(PT.y1)+52,fit('Swipe to steer · B: pin it · A: peek',16,FL.w-20),'#fff','center',{stroke:3});
  readyTxt(Q,'PIN IT!',FL)}
 
 // ===== Mode 8: Pecker Limbo (lean back under a lowering inflatable pole to the party beat; keep your balance; 3 tries) =====
@@ -957,11 +969,11 @@ const GATE_HASH='bfbe56885d33f05b961223170f34a0af243bd62f2d0d9d3dfdf4e3fa4058c96
 let gateIn='',gateMsg='',gateBusy=false,gateOK=LS.getItem('pps_gate')===GATE_HASH;
 const MODES=[
  {id:'fight',name:'Pecker Sword Fight',tag:'1v1 dance-off duel on a neon party stage',two:1,simul:1,ladder:1,cpu:1,start:fightStart,update:fightUpdate,draw:drawFight,lab:{a:'DODGE',b:'BOP'},
-  help:['Bop your rival 5 times, or fill their strap meter until their sword pops loose!','B: bop (hip-thrust). Hold ▲ + B: high BONK. Hold B, let go: BIG BOING.','A: hop back to dodge a bop. ▼ ducks under a high BONK.','Hold ▲ alone to shimmy: a full GROOVE meter makes your next bop a MEGA BOING.']},
+  help:['Bop your rival 5 times, or fill their strap meter until their sword pops loose!','B: bop (hip-thrust). Hold ▲ + B: high BONK. Hold B, let go: BIG BOING.','A: hop back to dodge a bop. ▼ ducks under a high BONK.','Swipe up and hold (alone) to dance / shimmy: a full GROOVE meter makes your next bop a MEGA BOING.']},
  {id:'duel',name:'Giant Sword Duel',tag:'Boing party guests off the pool deck',two:0,cpu:1,start:duelStart,update:duelUpdate,draw:drawDuel,lab:{a:'JUMP',b:'SWING'},
   help:['Swing your giant foam sword and boing the party guests into the pool!','B: swing. Hold B, let go: spin attack. Jump + B: belly-flop slam.','▼ guards. Guard just as they swing for a PARRY.','The more % a guest has, the further they fly. Don’t fall in yourself!']},
  {id:'sumo',name:'Pecker Sumo',tag:'Full-body inflatable costumes, best of 3',two:1,simul:1,ladder:1,cpu:1,start:sumoStart,update:sumoUpdate,draw:drawSumo,lab:{a:'HOP',b:'SHOVE'},
-  help:['Waddle and belly-bump your rival out of the ring. Best of 3 rounds!','D-pad: waddle in any direction. B: belly bump. Hold B, let go: MEGA BUMP.','A: hop to dodge a bump.','Stay away from the rope, and bump them from the middle!']},
+  help:['Waddle and belly-bump your rival out of the ring. Best of 3 rounds!','Swipe and hold: waddle in any direction. B: belly bump. Hold B, let go: MEGA BUMP.','A: hop to dodge a bump.','Stay away from the rope, and bump them from the middle!']},
  {id:'pinata',name:'Pecker Piñata',tag:'Whack it for candy and confetti',two:0,cpu:0,start:pinataStart,update:pinataUpdate,draw:drawPinata,lab:{a:'JUMP',b:'WHACK'},
   help:['Whack the swinging piñata with your bat before time runs out!','B: swing the bat. A: jump when the host yanks it up high.','Walk over the candy to collect it (+10 each).','Smash a piñata for a big bonus and a little extra time. Keep the hits coming to hold your combo!']},
  {id:'ring',name:'Pecker Ring Toss',tag:'Ring the bobbing pins · 10 rings',two:1,cpu:0,start:ringStart,update:ringUpdate,draw:drawRing,lab:{a:'HOP',b:'TOSS'},
@@ -969,7 +981,7 @@ const MODES=[
  {id:'joust',name:'Pool Float Joust',tag:'Lances on pool floats · best of 3',two:1,simul:1,ladder:1,cpu:1,start:joustStart,update:joustUpdate,draw:drawJoust,lab:{a:'DODGE',b:'POKE'},
   help:['Poke your rival off their pool float with your long inflatable lance! Best of 3.','◀▶ paddle. Hold ▲ high or ▼ low (or neither for middle). B: poke. Hold B, let go: MEGA POKE.','Match their lance height to PARRY. A MEGA POKE breaks a parry.','Every hit drains BALANCE. Hit zero and SPLASH! A: dodge (costs a little balance).']},
  {id:'pin',name:'Pin the Pecker',tag:'Blindfolded and dizzy · 5 pins',two:1,cpu:0,start:pinStart,update:pinUpdate,draw:drawPinGame,lab:{a:'PEEK',b:'PIN IT'},
-  help:['Memorize the ✕ on the party poster, get spun around, then pin it blindfolded!','D-pad: steer your wobbly hand. B: pin it. You have 7 seconds.','A: peek once per pin (costs 100 points).','The closer, the better: BULLSEYE = +500 bonus. It gets dizzier every pin!']},
+  help:['Memorize the ✕ on the party poster, get spun around, then pin it blindfolded!','Swipe and hold: steer your wobbly hand. B: pin it. You have 7 seconds.','A: peek once per pin (costs 100 points).','The closer, the better: BULLSEYE = +500 bonus. It gets dizzier every pin!']},
  {id:'limbo',name:'Pecker Limbo',tag:'How low can you go? 3 tries',two:1,cpu:0,start:limboStart,update:limboUpdate,draw:drawLimbo,lab:{a:'STEADY',b:'SHIMMY'},
   help:['Limbo under the inflatable pole. It drops lower every pass!','Hold ▼ to lean back. Don’t touch the pole. ◀▶ keep your balance.','B: shimmy on the beat for points (and it steadies you). Off-beat makes you wobble.','A: STEADY yourself (every 3 s). You get 3 tries.']}];
 const MODE=id=>MODES.find(m=>m.id===id);
@@ -995,10 +1007,10 @@ function drawPads(){const lab=(G&&G.M&&G.M.lab)||{a:'JUMP',b:'BOP'};
   const P=pd.pad,a=P.a,cx=P.cx,cy=P.cy,h=IN[i];
   if(LY.portrait){const nm=G&&G.two?(G.M.simul?(i?'PLAYER 2':'PLAYER 1'):(G.pl?'PLAYER 2':'PLAYER 1')):HERO.toUpperCase();txt(nm,(pd.ab.b.cx+pd.ab.a.cx)/2,pd.panel.y+24,fit(nm,16,pd.ab.a.cx-pd.ab.b.cx+2*pd.ab.a.r),i?'#8ef56a':'#ff86c4','center',{f:'ui-monospace,monospace'})}
   else if(G&&G.two&&G.M.simul)txt(i?'P2':'P1',pd.panel.x+22,pd.panel.y+22,16,i?'#8ef56a':'#ff86c4');
-  g.save();g.shadowColor='rgba(0,0,0,.5)';g.shadowOffsetY=4;padPath(cx,cy,a,a);g.fillStyle='#111015';g.fill();g.restore();
-  const arm={l:[cx-a,cy],r:[cx+a,cy],u:[cx,cy-a],d:[cx,cy+a]},ang={l:PI,r:0,u:-PI/2,d:PI/2};
-  for(const k of ['l','r','u','d']){const[x,y]=arm[k];if(h[k])rr(x-a/2+3,y-a/2+3,a-6,a-6,8,'rgba(255,216,74,.85)');tri(x+(k=='l'?-a*.08:k=='r'?a*.08:0),y+(k=='u'?-a*.08:k=='d'?a*.08:0),a*.22,ang[k],h[k]?'#1b1440':'#8f8c99')}
-  g.beginPath();g.arc(cx,cy,a*.22,0,TAU);g.fillStyle='#1d1b22';g.fill();g.strokeStyle='#3a3742';g.lineWidth=2;g.stroke();
+  // no D-pad (Peter 10/29): swipe and hold to move; hint where the pad used to be (arrows light up while you swipe that way)
+  {const hw=Math.max(60,Math.min(3*a,(pd.ab.b.cx-pd.ab.b.r-cx)*2-8));const M='ui-monospace,monospace';txt('SWIPE',cx,cy-12,fit('SWIPE',16,hw,{f:M}),'#8f8c99','center',{f:M});txt('TO MOVE',cx,cy+12,fit('TO MOVE',16,hw,{f:M}),'#8f8c99','center',{f:M});
+   const arm={l:[cx-a*1.05,cy],r:[cx+a*1.05,cy],u:[cx,cy-a*1.05],d:[cx,cy+a*1.05]},ang={l:PI,r:0,u:-PI/2,d:PI/2};
+   for(const k of ['l','r','u','d']){const[x,y]=arm[k];if(k=='l'||k=='r'){if(Math.abs(x-cx)>hw/2+14)continue}tri(x,y,a*.16,ang[k],h[k]?'#ffd84a':'#5d5a66')}}
   for(const k of ['b','a']){const q=pd.ab[k],on=h[k],dy=on?2:0;g.beginPath();g.arc(q.cx,q.cy+3,q.r,0,TAU);g.fillStyle='#000';g.fill();
    g.beginPath();g.arc(q.cx,q.cy+dy,q.r,0,TAU);g.fillStyle=on?'#ff6a5a':'#d1302f';g.fill();g.lineWidth=3;g.strokeStyle=on?'#ffd84a':'#7c1515';g.stroke();
    g.beginPath();g.arc(q.cx-q.r*.3,q.cy+dy-q.r*.35,q.r*.28,0,TAU);g.fillStyle='rgba(255,255,255,.28)';g.fill();
@@ -1063,9 +1075,9 @@ function drawOpts(){neonBg();const m=optMode,cx=W/2,bw=Math.min(320,W-50);txt(m.
  let y=para(m.tag,cx,90,17,'#fff',W-40)+10;txt(m.ladder?'1 PLAYER vs CPU':'1 PLAYER · SCORE ATTACK',cx,y+6,20,'#20f0ff');y+=30;
  if(!m.ladder){btn('d0',cx-bw/2,y,bw,58,'▶ PLAY',()=>startMode(m.id,{diff:0}),{col:'#1f9d55',def:1,sz:22});y+=68}else DIFF.forEach((d,i)=>{btn('d'+i,cx-bw/2,y,bw,54,d.n+'  ·  6 rivals',()=>startMode(m.id,{diff:i}),{col:['#1f9d55','#e08a00','#d12f2f'][i],def:i===0,sz:20});y+=64});
  if(m.two){y+=6;txt('2 PLAYERS · SAME PHONE',cx,y+6,20,'#8ef56a');y+=30;const lk=locked(m.id,true,0);btn('two',cx-bw/2,y,bw,56,(lk?'🔒 ':'')+(m.simul?'PLAYER 1 vs PLAYER 2':'P1 vs P2 · TAKE TURNS'),()=>startMode(m.id,{two:true}),{col:'#9b4bc0',sz:19});y+=62;
-  para(!m.simul?'Player 1 plays a full round, then passes the phone to Player 2. High score wins.':LY.portrait?'Player 2 holds the top of the phone: each player gets their own pad.':'Player 1 uses the left pad, Player 2 the right pad.',cx,y+8,16,'#e6dcff',W-40);y+=48}
+  para(!m.simul?'Player 1 plays a full round, then passes the phone to Player 2. High score wins.':LY.portrait?'Player 2 holds the top of the phone: each player swipes on their own half and has their own A/B.':'Player 1 swipes on the left half, Player 2 on the right half. Each has their own A/B.',cx,y+8,16,'#e6dcff',W-40);y+=48}
  btn('back',16,H-70,120,52,'◀ BACK',()=>{state='modes'},{col:'#4a3a6a',sz:18})}
-function drawHelp(){neonBg();const cx=W/2,mw=Math.min(W-40,520),pages=[{name:'Controls',help:['D-pad: move, dance and duck. Slide your thumb to change direction.','A: jump / dodge.   B: attack / bop / action.','Keyboard: arrows or WASD, Space/Z = A, X/J = B, P = pause, M = mute.','2 players on a keyboard: P1 = WASD + F (A) + G (B), P2 = arrows + K (A) + L (B).','🎮 Controller (USB or Bluetooth, computer or paired to your phone): stick/D-pad move, A jump/dodge, B or X attack, Start pause, Select sound. Menus: D-pad + A, B goes back.']},...MODES.filter(m=>!m.soon)];const p=pages[helpPage];
+function drawHelp(){neonBg();const cx=W/2,mw=Math.min(W-40,520),pages=[{name:'Controls',help:['No D-pad: swipe and hold anywhere on your side of the screen to move (slide your thumb to change direction, let go to stop). ▲▼◀▶ in the tips mean swipe that way and hold.','Quick swipe up: jump / hop / dodge (same as A). Swipe up and hold: dance (shimmy) or go high. Swipe down and hold: duck or go low.','A: jump / dodge.   B: attack / bop / action.','Keyboard: arrows or WASD, Space/Z = A, X/J = B, P = pause, M = mute.','2 players on a keyboard: P1 = WASD + F (A) + G (B), P2 = arrows + K (A) + L (B).','🎮 Controller (USB or Bluetooth, computer or paired to your phone): stick/D-pad move, A jump/dodge, B or X attack, Start pause, Select sound. Menus: D-pad + A, B goes back.']},...MODES.filter(m=>!m.soon)];const p=pages[helpPage];
  txt('HOW TO PLAY',cx,46,28,'#ffe14a','center',{stroke:5,sc:'#3a0050'});txt(p.name,cx,90,fit(p.name,24,W-40),'#20f0ff','center',{stroke:4});let y=130;
  for(const h of p.help){y=para('• '+h,cx,y,18,'#fff',mw)+12}
  txt((helpPage+1)+' / '+pages.length,cx,H-150,18,'#cfc8e8');
