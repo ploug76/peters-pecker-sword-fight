@@ -382,13 +382,18 @@ function costume(x,y,s,L,o={}){const sq=o.sq||1,lean=o.lean||0,belt=o.belt||'#20
 
 // ===== Mode 1: Pecker Sword Fight (side-view 1v1 dance-off duel) =====
 const LADDER=['kelly','barry','pam','greg','bruno','bianca'];
+// 1-player rival picking (Peter 10/29: "It's Kelly against Peter, that's the game"): every new 1P run builds its own 6-rival ladder.
+// Rivals 1-5: Chef Kelly 75% of the time, otherwise a random surprise challenger (no repeats in a run); rival 6 (final boss) is always Kelly.
+const KELLY_P=.75,CHALLENGERS=['barry','pam','greg','bruno','bianca','brenda'];
+function mkLadder(rand=Math.random){const pool=CHALLENGERS.slice(),L=[];for(let i=0;i<LADDER.length-1;i++){if(rand()<KELLY_P||!pool.length)L.push('kelly');else L.push(pool.splice(Math.floor(rand()*pool.length),1)[0])}L.push('kelly');return L}
+const rivalAt=i=>((G&&G.lad)||LADDER)[i];
 const DIFF=[{n:'EASY',k:0,mul:1},{n:'MEDIUM',k:.35,mul:1.5},{n:'HARD',k:.7,mul:2}];
 const STAGE={l:14,r:286,w:300,h:190,gy:168};
 const CTLS=()=>G.two?[0,1]:[0];
 function mkFighter(look,x,face,i){return{look,L:LOOKS[look],x,y:0,vy:0,vx:0,face,i,st:'idle',t:0,cd:0,hold:0,charge:0,groove:0,strap:0,bops:0,inv:0,stun:0,
  sw:{ang:.15,vel:0,infl:1,len:30,loose:false},hit:false,kind:'mid',power:false,mega:false,duck:0,step:0,ai:null,lastIn:NOI(),prevIn:NOI(),taunt:0}}
 function aiParams(lv){return{react:.44-.26*lv,dodge:.2+.55*lv,right:.5+.38*lv,aggr:.35+.55*lv,power:.06+.2*lv,think:0,plan:null,hold:0,duckT:0,bT:0,lv}}
-function fightStart(){const F=G;F.f=[mkFighter('peter',90,1,0),mkFighter(F.two?'kelly':LADDER[F.opp],210,-1,1)];
+function fightStart(){const F=G;F.f=[mkFighter('peter',90,1,0),mkFighter(F.two?'kelly':rivalAt(F.opp),210,-1,1)];
  if(!F.two){const lv=CL(DIFF[F.diff].k+F.opp*.05,0,.9);F.f[1].ai=aiParams(lv)}if(F.bot)F.f[0].ai=aiParams(.95);
  F.phase='ready';F.pt=0;F.time=60;F.fx=[];F.winner=-1;F.flying=null}
 function fInput(f){const F=G;if(f.ai)return aiInput(f,F.f[1-f.i]);return IN[f.i]}
@@ -602,7 +607,7 @@ function drawDuel(){const D=G,FL=LY.field,k=Math.min(FL.w/DECK.w,FL.h/(DECK.h+30
 const RING=100,WR=21;
 function mkWrestler(look,x,i){return{look,L:LOOKS[look],i,x,z:0,vx:0,vz:0,fx:i?-1:1,fz:0,st:'idle',t:0,hold:0,charge:0,air:0,ay:0,wob:0,wv:0,m:LOOKS[look].body>1.3?1.35:1,cd:0,prevIn:NOI(),ai:null,pw:0}}
 function sumoStart(){const S=G;S.rw=[0,0];S.round=0;S.fx=[];sumoRound()}
-function sumoRound(){const S=G;S.round++;S.w=[mkWrestler('peter',-45,0),mkWrestler(S.two?'kelly':LADDER[S.opp],45,1)];
+function sumoRound(){const S=G;S.round++;S.w=[mkWrestler('peter',-45,0),mkWrestler(S.two?'kelly':rivalAt(S.opp),45,1)];
  if(!S.two)S.w[1].ai=aiParams(CL(DIFF[S.diff].k+S.opp*.05,0,.88));if(S.bot)S.w[0].ai=aiParams(.95);if(S.two)S.w[1].m=1;S.phase='ready';S.pt=0;S.outBy=-1}
 function sumoInput(w,o){if(!w.ai)return IN[w.i];const A=w.ai,I=NOI(),dx=o.x-w.x,dz=o.z-w.z,d=Math.hypot(dx,dz),rm=Math.hypot(w.x,w.z);
  const go=(tx,tz)=>{const ax=tx-w.x,az=tz-w.z,n=Math.hypot(ax,az)||1;if(ax/n>.38)I.r=1;if(ax/n<-.38)I.l=1;if(az/n>.38)I.d=1;if(az/n<-.38)I.u=1};
@@ -785,7 +790,7 @@ function drawRing(){const Q=G,FL=LY.field,k=Math.min(FL.w/312,FL.h/(RT.gy+30)),o
 const JO={l:34,r:266,wy:150,minD:50,reach:68};
 function mkJouster(look,x,i){return{look,L:LOOKS[look],i,x,vx:0,face:i?-1:1,lvl:0,st:'idle',t:0,bal:100,prevIn:NOI(),ai:null,cd:0,hold:0,charge:0,pw:0,wob:0,wv:0,hit:false,bob:rnd(0,TAU),rot:0,sink:0}}
 function joustStart(){const Q=G;Q.rw=[0,0];Q.round=0;Q.fx=[];joustRound()}
-function joustRound(){const Q=G;Q.round++;Q.j=[mkJouster('peter',100,0),mkJouster(Q.two?'kelly':LADDER[Q.opp],200,1)];
+function joustRound(){const Q=G;Q.round++;Q.j=[mkJouster('peter',100,0),mkJouster(Q.two?'kelly':rivalAt(Q.opp),200,1)];
  if(!Q.two)Q.j[1].ai=joAI(CL(DIFF[Q.diff].k+Q.opp*.06,0,.9));if(Q.bot)Q.j[0].ai=joAI(.95);Q.phase='ready';Q.next='fight';Q.pt=0;Q.time=45}
 function joAI(lv){return{lv,react:.4-.22*lv,seen:0,dec:null,think:0,lvl0:0,mv:0,bT:0,wait:0}}
 function joInput(j,o){const A=j.ai;if(!A)return IN[j.i];const I=NOI(),d=Math.abs(o.x-j.x),f=j.face;let lvl=A.lvl0;
@@ -1013,7 +1018,7 @@ const SAMPLE=()=>!!window.__SAMPLE;
 function locked(id,two,opp){return SAMPLE()&&(id!=='fight'||two||(opp||0)>0)}
 function wantUnlock(){window.__smpWant=1;try{window.__sampleLock&&window.__sampleLock.lock()}catch(e){}}
 function startMode(id,o={}){const m=MODE(id);if(locked(id,o.two,0)){wantUnlock();return}lastMode={id,two:!!o.two,diff:o.diff??(G?G.diff:0)};
- G={mode:id,M:m,two:!!o.two,diff:o.diff??(G?G.diff:0),opp:0,score:0,wins:0,fx:[],bot:!!(window.__T&&__T.bot)};LY=layout(G.two&&!!m.simul);startVs()}
+ G={mode:id,M:m,two:!!o.two,diff:o.diff??(G?G.diff:0),opp:0,score:0,wins:0,fx:[],bot:!!(window.__T&&__T.bot)};if(m.ladder&&!G.two)G.lad=mkLadder();LY=layout(G.two&&!!m.simul);startVs()}
 function startVs(){if(locked(G.mode,G.two,G.opp)){wantUnlock()}state='vs';G.vsT=0;resetInput()}
 function vsGo(){if(state!=='vs'||G.vsT<.4)return;G.M.start();state='play';paused=false;resetInput();musOn=true}
 function toModes(){G=null;LY=layout(false);state='modes';paused=false;resetInput()}
@@ -1109,10 +1114,10 @@ function drawHelp(){neonBg();const cx=W/2,mw=Math.min(W-40,520),pages=[{name:'Co
 function drawVs(){const F=LY.field;G.vsT+=1/60;const m=G.M;g.fillStyle='#14001f';g.fillRect(0,0,W,H);g.save();g.beginPath();g.rect(F.x,F.y,F.w,F.h);g.clip();
  const bg2=g.createLinearGradient(F.x,0,F.x+F.w,0);bg2.addColorStop(0,'#ff2e88');bg2.addColorStop(.5,'#2a0640');bg2.addColorStop(1,'#20a0c0');g.fillStyle=bg2;g.fillRect(F.x,F.y,F.w,F.h);neonShapes(F.x,F.y,F.w,F.h,9);
  const cx=F.x+F.w/2;let y=F.y+(LY.portrait&&!LY.two?58:12);txt(m.name.toUpperCase(),cx,y+12,fit(m.name.toUpperCase(),24,F.w-20),'#ffe14a','center',{stroke:5,sc:'#3a0050'});y+=36;
- if(m.ladder){const pw=Math.min(F.w*.3,(F.h-y+F.y)*.33,120),ph=pw*1.25,opp=G.two?LOOKS.kelly:LOOKS[LADDER[G.opp]];
+ if(m.ladder){const pw=Math.min(F.w*.3,(F.h-y+F.y)*.33,120),ph=pw*1.25,opp=G.two?LOOKS.kelly:LOOKS[rivalAt(G.opp)];
   portrait(cx-pw-34,y,pw,ph,'#ff2e88');headCard(cx+34,y,pw,ph,opp,'#8ef56a');txt('VS',cx,y+ph/2,40,'#fff','center',{stroke:6,sc:'#ff2bd6'});
   txt(G.two?'P1':HERO,cx-pw/2-34,y+ph+18,fit(G.two?'P1 · '+HERO:HERO,18,pw+50),'#fff','center',{stroke:4});txt(G.two?'P2 · KELLY':opp.short,cx+pw/2+34,y+ph+18,fit(G.two?'P2 · KELLY':opp.short,18,pw+30),'#fff','center',{stroke:4});
-  if(!G.two)txt('RIVAL '+(G.opp+1)+' / '+LADDER.length+' · '+DIFF[G.diff].n,cx,y+ph+46,fit('RIVAL 6 / 6 · MEDIUM',16,F.w-20),'#20f0ff','center',{stroke:3});y+=ph+66}
+  if(!G.two){const rk=rivalAt(G.opp),fin=G.opp>=LADDER.length-1,rt=(fin?'FINAL BOSS · ':rk!=='kelly'?'SURPRISE CHALLENGER! · ':'')+'RIVAL '+(G.opp+1)+' / '+LADDER.length+' · '+DIFF[G.diff].n;txt(rt,cx,y+ph+46,fit(rt,16,F.w-20),fin?'#ffe14a':rk!=='kelly'?'#ff9ad5':'#20f0ff','center',{stroke:3})}y+=ph+66}
  else{const pw=Math.min(110,F.w*.3,(F.h-y+F.y)*.3),ph=pw*1.25;if(G.two&&G.pl)headCard(cx-pw/2,y,pw,ph,LOOKS.kelly,'#8ef56a');else portrait(cx-pw/2,y,pw,ph,'#2a9df4');y+=ph+(G.two?8:30);
   if(G.two){const s2=turnTag()+"'S TURN"+(G.pl?' · BEAT '+G.sc[0].toLocaleString():'');txt(s2,cx,y+10,fit(s2,20,F.w-20),G.pl?'#8ef56a':'#ff9ad5','center',{stroke:4});y+=34}}
  const mw=F.w-30;for(const h of m.help.slice(0,F.h>420?4:2)){y=para('• '+h,cx,y,16,'#fff',mw,'center',1.25)+6;if(y>F.y+F.h-80)break}
@@ -1147,7 +1152,7 @@ function render(){menuBtns=[];g.setTransform(DPR,0,0,DPR,0,0);g.imageSmoothingEn
 if(gateOK)document.title=GAME_TITLE;
 resize();if(!gateOK)state='gate';requestAnimationFrame(frame);
 // ---------- test hooks ----------
-window.__T={get state(){return state},set state(v){state=v},get G(){return G},get LY(){return LY},get IN(){return IN},menuBtns:()=>menuBtns,startMode,vsGo,toModes,toTitle,gameOver,sha256hex,
+window.__T={get state(){return state},set state(v){state=v},get G(){return G},get LY(){return LY},get IN(){return IN},menuBtns:()=>menuBtns,startMode,mkLadder,vsGo,toModes,toTitle,gameOver,sha256hex,
  step(n){for(let i=0;i<n&&state==='play';i++)update();return state},bot:false,setKeys(i,o){keys[i]=Object.assign(NOI(),o);recompute()},age(){ageOK=true},fx:()=>G&&G.fx};
 
 ;(function(){/*swup v1: check for updates on every open*/if(window.__swup)return;window.__swup=1;var S=navigator.serviceWorker;if(!S||!/^https?:$/.test(location.protocol))return;var ARC=0,BUSY=0,had=!!S.controller,inp=0,K='swup:'+location.pathname;['pointerdown','keydown','touchstart','wheel'].forEach(function(t){addEventListener(t,function(){inp=1},{capture:true,passive:true})});function chk(){try{S.getRegistration().then(function(r){if(r)r.update().catch(function(){})},function(){})}catch(e){}}addEventListener('load',function(){setTimeout(chk,800)});document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){if(ARC)inp=0;chk()}});addEventListener('pageshow',function(e){if(e.persisted){if(ARC)inp=0;chk()}});function pill(){if(document.getElementById('swupPill'))return;var b=document.createElement('button');b.id='swupPill';b.type='button';b.textContent='Update ready \u2013 tap to refresh';b.style.cssText='position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 8px);transform:translateX(-50%);z-index:2147483647;padding:8px 14px;border:0;border-radius:999px;background:#ffd23f;color:#111;font:600 14px system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.45);cursor:pointer';b.addEventListener('click',function(){location.reload()});(document.body||document.documentElement).appendChild(b)}S.addEventListener('controllerchange',function(){if(!had){had=true;return}var n=Date.now(),l=0,busy=false;try{l=+sessionStorage.getItem(K)||0}catch(e){}try{busy=!!(BUSY&&BUSY())}catch(e){}if(inp||busy||n-l<15000||document.visibilityState!=='visible'){pill();return}try{sessionStorage.setItem(K,String(n))}catch(e){}location.reload()})})();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).catch(()=>{});
