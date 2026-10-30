@@ -200,6 +200,12 @@ function inflatable(len,th,col=PINK){const c2=shade(col,-.18),o=shade(col,-.45);
  g.setLineDash([1.2,1.6]);line(th*.3,th*.18,len-th*.5,th*.18,shade(col,-.25),.6);g.setLineDash([]);
  ell(-th*.2,0,th*.16,th*.16,'#fff2f8',o,.7)}
 function drawSword(x,y,ang,len,infl,face,col,sq=1){g.save();g.translate(x,y);g.scale(face,1);g.rotate(ang);inflatable(len*infl,10*infl*sq,col);g.restore()}
+// leg check (Grey Heart, Oct 2026): stride phase from distance actually moved (render-only), amplitude eases in/out so legs settle to standing
+function legGait(o,x,ok,z){const now=performance.now(),dt=o._gt?Math.min(.1,(now-o._gt)/1000):0;o._gt=now;z=z||0;
+ if(o._gp===undefined){o._gp=0;o._ga=0;o._mv=0;o._lx=x;o._lz=z}const d=Math.hypot(x-o._lx,z-o._lz);o._lx=x;o._lz=z;
+ if(ok&&d>.12&&d<40)o._mv=.1;else o._mv-=dt;const mv=o._mv>0;
+ o._ga+=((mv?1:0)-o._ga)*Math.min(1,dt*10);if(mv&&d<40)o._gp+=d/26*PI;else if(!mv&&o._ga<.03){o._ga=0;o._gp=Math.round(o._gp/PI)*PI}
+ return[o._gp,o._ga]}
 // --- a cartoon adult, front view, feet at (x,y), s = px per world unit ---
 function drawPerson(x,y,s,L,o={}){const f=o.face||1,sq=CL(o.squat||0,0,1),bw=11*L.body,lean=o.lean||0,bob=o.bob||0;
  g.save();g.translate(x,y);g.scale(s,s);
@@ -207,7 +213,8 @@ function drawPerson(x,y,s,L,o={}){const f=o.face||1,sq=CL(o.squat||0,0,1),bw=11*
  const hipY=-26+sq*9+bob,shY=hipY-30+sq*2,hx=lean*5*f;
  // legs
  const legC=L.f?L.skin:L.pants,kx=4+sq*7;
- for(const sd of [-1,1]){const fx=sd*(6+sq*5)+(o.step?sd*o.step*3:0);limb(hx+sd*4.5,hipY,hx*.5+sd*kx,hipY*.45-sq*2,fx,-2.5,legC,L.f?5.2:6.4);ell(fx+sd*1.2,-1.6,4.6,2.6,L.shoe)}
+ const ga=o.amp||0,gp=o.ph||0;/* leg check: alternating stride (lift + reach in the facing direction) from legGait, eases to standing */
+ for(const sd of [-1,1]){const ps=gp+(sd>0?0:PI),sw=Math.sin(ps)*ga,lf=Math.max(0,Math.cos(ps))*ga,fx=sd*(6+sq*5)+f*sw*3.6,fy=-2.5-lf*3.2;limb(hx+sd*4.5,hipY,hx*.5+sd*kx+f*(lf*2.2+sw*1.2),hipY*.45-sq*2-lf*2.5,fx,fy,legC,L.f?5.2:6.4);ell(fx+sd*1.2,-1.6-lf*3.2,4.6,2.6,L.shoe)}
  g.save();g.translate(hx,0);g.rotate(-lean*.12*f);
  if(L.hs==='kelly'){g.save();g.translate(0,shY-11);kellyHairBack(L.head||11,o);g.restore()}
  // torso / outfit
@@ -365,7 +372,7 @@ function costume(x,y,s,L,o={}){const sq=o.sq||1,lean=o.lean||0,belt=o.belt||'#20
  ell(0,2,26,7,'rgba(0,0,0,.3)');
  g.save();g.rotate(lean*.25);g.scale(1/Math.sqrt(sq),sq);
  // legs
- line(-7,-10,-8,-1,L.pants||L.skin,6);line(7,-10,8,-1,L.pants||L.skin,6);ell(-9,-1,5,2.6,L.shoe);ell(9,-1,5,2.6,L.shoe);
+ {const ga=o.amp||0,gp=o.ph||0,fd=o.face||1;for(const sd of [-1,1]){const ps=gp+(sd>0?0:PI),sw=Math.sin(ps)*ga*fd*4.5,lf=Math.max(0,Math.cos(ps))*ga*1.8;line(sd*7,-10,sd*8+sw,-1-lf,L.pants||L.skin,6);ell(sd*9+sw,-1-lf,5,2.6,L.shoe)}}
  // base bulbs + body + tip
  const o2=PINKO;ell(-11,-14,10,10,PINKD,o2,1.2);ell(11,-14,10,10,PINKD,o2,1.2);
  const gr=g.createLinearGradient(-18,0,18,0);gr.addColorStop(0,PINKD);gr.addColorStop(.35,'#ff9bd0');gr.addColorStop(1,PINKD);
@@ -477,9 +484,9 @@ function drawFight(){const F=G,FL=LY.field,vw=CL(FL.w/FL.h*300,200,STAGE.w),k=Ma
  // keep the two inflatables from passing through each other: when they'd overlap, both squish (a thrusting one gets the room)
  const SV=fightSwordVis(F);
  for(const f of [...F.f].sort((p,q)=>(p.st==='thrust')-(q.st==='thrust'))){
-  const thr=f.st==='thrust'?Math.sin(CL(f.t/.2,0,1)*PI):0,dance=f.st==='taunt'?Math.sin(t*.35):0;
+  const LG=legGait(f,f.x,f.st==='walk'),thr=f.st==='thrust'?Math.sin(CL(f.t/.2,0,1)*PI):0,dance=f.st==='taunt'?Math.sin(t*.35):0;
   drawPerson(sx(f.x),sy(STAGE.gy-f.y),k,f.L,{face:f.face,squat:f.st==='duck'?1:f.st==='charge'?.4:f.st==='taunt'?.25+.2*Math.sin(t*.7):0,lean:thr*(f.kind==='high'?.6:1.2)+(f.st==='taunt'?dance*.6:0)-(f.st==='stun'?.5:0),
-   bob:f.st==='walk'?Math.abs(Math.sin(f.step))*-1.5:f.st==='idle'?Math.sin(t*.15+f.i)*.8:0,step:f.st==='walk'?Math.sin(f.step):0,arms:f.st==='taunt'||F.phase==='ko'&&f.st!=='ko'?'party':f.st==='thrust'?'back':f.st==='stun'||f.st==='ko'?'up':'down',armPh:t*.3,
+   bob:LG[1]>.02?Math.abs(Math.sin(LG[0]))*-1.5*LG[1]:f.st==='idle'?Math.sin(t*.15+f.i)*.8:0,ph:LG[0],amp:LG[1],arms:f.st==='taunt'||F.phase==='ko'&&f.st!=='ko'?'party':f.st==='thrust'?'back':f.st==='stun'||f.st==='ko'?'up':'down',armPh:t*.3,
    hurt:f.st==='stun',ko:f.st==='ko',dizzy:f.st==='ko',mouth:f.st==='thrust'||f.st==='charge'?'grin':null,blink:(t+f.i*50)%200<6,sword:{...f.sw,len:SV[f.i].len,sq:SV[f.i].sq,col:f.i?'#8ef56a':PINK}});
   if(f.st==='charge'){g.globalAlpha=.4+.3*Math.sin(t);ell(sx(f.x+f.face*30),sy(STAGE.gy-26-f.y),10*k*f.charge,10*k*f.charge,'#ffe14a');g.globalAlpha=1}}
  if(F.flying){const q=F.flying;g.save();g.translate(sx(q.x),sy(q.y));g.rotate(q.a);g.scale(k,k);inflatable(30,10,'#8ef56a');g.restore()}
@@ -587,13 +594,13 @@ function drawDuel(){const D=G,FL=LY.field,k=Math.min(FL.w/DECK.w,FL.h/(DECK.h+30
  const sx=x=>ox+x*k,sy=y=>oy+y*k;poolDeck(FL,gyS,sx,k,DECK.l,DECK.r);
  for(const e of D.en){const y=e.st==='climb'?DECK.gy-e.y:e.st==='fall'?DECK.gy+12+e.t*20:DECK.gy-e.y;if(e.st==='fall'&&e.t>.4)continue;
   g.save();if(e.st==='climb'||e.st==='fall'){g.beginPath();g.rect(FL.x,FL.y,FL.w,gyS+12*k-FL.y);g.clip()}
-  const sc=e.T.boss?1.18:1;drawPerson(sx(e.x),sy(y),k*sc,e.L,{face:e.face,arms:e.st==='wind'?'raise':'hold',hurt:e.st==='fly'||e.st==='stun',dizzy:e.st==='dizzy'||e.st==='stun',step:e.st==='walk'?Math.sin(e.step):0,mouth:e.st==='wind'?'grin':null});
+  const sc=e.T.boss?1.18:1,LG=legGait(e,e.x,e.st==='walk');drawPerson(sx(e.x),sy(y),k*sc,e.L,{face:e.face,arms:e.st==='wind'?'raise':'hold',hurt:e.st==='fly'||e.st==='stun',dizzy:e.st==='dizzy'||e.st==='stun',ph:LG[0],amp:LG[1],mouth:e.st==='wind'?'grin':null});
   // their foam sword in hand
   const hy=y-36*sc,ang=e.st==='wind'?-1.9:e.st==='atk'?.5:e.sw.ang;g.save();g.translate(sx(e.x+e.face*10*e.L.body*sc),sy(hy));g.scale(e.face*k*sc,k*sc);g.rotate(ang);inflatable(e.T.len,7,'#8ef56a');g.restore();
   if(e.st==='wind')txt('!',sx(e.x),sy(y-100*sc),26,'#ffe14a','center',{stroke:4});
   if(e.pct>0&&e.st!=='fall')txt(Math.round(e.pct)+'%',sx(e.x),sy(y+12),16,e.pct>60?'#ff5a5a':'#fff','center',{stroke:3});g.restore()}
  const P=D.p;if(!(P.inv>0&&Math.floor(t/4)%2&&P.st!=='fall')){g.save();if(P.st==='fall'){g.beginPath();g.rect(FL.x,FL.y,FL.w,gyS+12*k-FL.y);g.clip()}
-  const y=P.st==='fall'?DECK.gy+P.t*30:DECK.gy-P.y;drawPerson(sx(P.x),sy(y),k,LOOKS.peter,{face:P.face,arms:'hold',squat:P.st==='guard'?.35:P.st==='charge'?.25:0,hurt:P.st==='hurt',step:P.st==='walk'?Math.sin(P.step):0,mouth:P.st==='swing'||P.st==='spin'?'grin':null,blink:t%180<6});
+  const y=P.st==='fall'?DECK.gy+P.t*30:DECK.gy-P.y,LG=legGait(P,P.x,P.st==='walk');drawPerson(sx(P.x),sy(y),k,LOOKS.peter,{face:P.face,arms:'hold',squat:P.st==='guard'?.35:P.st==='charge'?.25:0,hurt:P.st==='hurt',ph:LG[0],amp:LG[1],mouth:P.st==='swing'||P.st==='spin'?'grin':null,blink:t%180<6});
   const S=swingArc(P);g.save();g.translate(sx(P.x+P.face*9),sy(y-38));g.scale(P.face*k,k);g.rotate(S.a+.0);inflatable(S.len,13,PINK);g.restore();
   if(P.st==='charge'){g.globalAlpha=.35;ell(sx(P.x),sy(y-40),70*k*P.charge,40*k*P.charge,'#ffe14a');g.globalAlpha=1}g.restore()}
  drawFx(sx,sy,k);
@@ -662,7 +669,7 @@ function drawSumo(){const S=G,FL=LY.field,k=Math.min(FL.w/(RING*2.75),FL.h/(RING
  const list=[...S.w].sort((p,q)=>p.z-q.z);
  for(const w of list){let[x,y]=P(w.x,w.z);if(w.st==='out'){y+=Math.min(60,w.t*120)}y-=w.ay*k;
   g.save();if(w.st==='out'&&w.z<0){}
-  costume(x,y,k*.86,w.L,{sq:1+w.wob*.12,lean:CL(w.vx/300,-.4,.4),belt:w.i?'#8ef56a':'#20f0ff',face:w.fx>=0?1:-1,hurt:w.st==='out',mouth:w.st==='bump'||w.st==='charge'?'grin':null,arms:w.st==='charge'?1:w.st==='bump'?-1:0});
+  const LG=legGait(w,w.x,w.st!=='out'&&!(w.ay>0),w.z);costume(x,y,k*.86,w.L,{ph:LG[0],amp:LG[1],sq:1+w.wob*.12,lean:CL(w.vx/300,-.4,.4)+Math.sin(LG[0])*.18*LG[1],belt:w.i?'#8ef56a':'#20f0ff',face:w.fx>=0?1:-1,hurt:w.st==='out',mouth:w.st==='bump'||w.st==='charge'?'grin':null,arms:w.st==='charge'?1:w.st==='bump'?-1:0});
   if(w.st==='charge'){g.globalAlpha=.35;ell(x,y-40*k*.86,30*k*w.charge,30*k*w.charge,'#ffe14a');g.globalAlpha=1}
   const nm=G.two?(w.i?'P2 KELLY':'P1'):w.i?w.L.short:'PETER';if(S.phase==='ready'||G.two)txt(nm,x,y+18,16,w.i?'#8ef56a':'#20f0ff','center',{stroke:3});g.restore()}
  drawFx(x=>cx+x*k,y=>cy+y*k*.5,k);
@@ -713,7 +720,7 @@ function drawPinata(){const Q=G,FL=LY.field,k=Math.min(FL.w/220,FL.h/(PIN.gy+30)
   g.restore();
   const hp=pn.hp/pn.max;rr(sx(q.x)-24,sy(q.y)+30*k,48,8,4,'rgba(0,0,0,.5)');rr(sx(q.x)-24,sy(q.y)+30*k,48*hp,8,4,'#ffe14a')}
  for(const c of Q.candy){g.fillStyle=c.c;rr(sx(c.x)-3*k,sy(c.y)-2*k,6*k,4*k,2*k,c.c)}
- const P=Q.p,sw=P.st==='swing'?CL(P.t/.18,0,1):0;drawPerson(sx(P.x),sy(PIN.gy-P.y),k,LOOKS.peter,{face:P.face,arms:'hold',step:Math.sin(P.step)*(IN[0].l||IN[0].r?1:0),mouth:P.st==='swing'?'grin':null,blink:t%160<6});
+ const P=Q.p,sw=P.st==='swing'?CL(P.t/.18,0,1):0;const LG=legGait(P,P.x,P.y<=.5);drawPerson(sx(P.x),sy(PIN.gy-P.y),k,LOOKS.peter,{face:P.face,arms:'hold',ph:LG[0],amp:LG[1],mouth:P.st==='swing'?'grin':null,blink:t%160<6});
  g.save();g.translate(sx(P.x+P.face*8),sy(PIN.gy-P.y-38));g.scale(P.face*k,k);g.rotate(lerp(-2.2,.4,sw));rr(-2,-2.5,40,5,2.5,'#c8853a','#7a4a1a',1);rr(30,-3.5,12,7,3.5,'#d9964a','#7a4a1a',1);g.restore();
  drawFx(sx,sy,k);
  const top=FL.y+(LY.portrait?60:8);rr(FL.x+10,top,150,58,10,'rgba(10,0,20,.7)','#fff',2);txt('PIÑATA '+pn.n,FL.x+20,top+16,18,'#ffe14a','left');txt(Math.ceil(Q.time)+'s',FL.x+20,top+40,20,Q.time<10?'#ff5a5a':'#fff','left');
@@ -978,7 +985,7 @@ function drawLimbo(){const Q=G,FL=LY.field,k=Math.min(FL.w/300,FL.h/(LB.gy+40)),
  // the limbo-er: whole body tips back from the feet
  const me=G.pl?LOOKS.kelly:LOOKS.peter,ang=P.st==='fall'?P.fallA+P.b*1.22:P.b*1.22,wob=P.st==='walk'?P.bl*.25:0;
  g.save();g.translate(sx(P.x),sy(LB.gy));g.rotate(-(ang+wob));g.translate(-sx(P.x),-sy(LB.gy));
- drawPerson(sx(P.x),sy(LB.gy),k,me,{face:1,squat:Math.min(.6,P.b*.7),arms:P.shim>0?'party':P.b>.3?'up':'party',armPh:t*.3,step:P.st==='walk'&&P.b<.3?Math.sin(P.step):0,mouth:P.st==='oops'?null:'grin',hurt:P.st==='oops'||P.st==='fall',blink:t%170<6});g.restore();
+ drawPerson(sx(P.x),sy(LB.gy),k,me,{face:1,squat:Math.min(.6,P.b*.7),arms:P.shim>0?'party':P.b>.3?'up':'party',armPh:t*.3,...(L=>({ph:L[0],amp:L[1]}))(legGait(P,P.x,P.st==='walk')),mouth:P.st==='oops'?null:'grin',hurt:P.st==='oops'||P.st==='fall',blink:t%170<6});g.restore();
  drawFx(sx,sy,k);
  // HUD + balance needle
  const top=FL.y+(LY.portrait?60:8);rr(FL.x+10,top,170,58,10,'rgba(10,0,20,.7)','#fff',2);txt('POLE '+Math.round(Q.hp)+'cm',FL.x+20,top+16,16,'#ffe14a','left');
