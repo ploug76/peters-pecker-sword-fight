@@ -204,7 +204,7 @@ function drawSword(x,y,ang,len,infl,face,col,sq=1){g.save();g.translate(x,y);g.s
 function legGait(o,x,ok,z){const now=performance.now(),dt=o._gt?Math.min(.1,(now-o._gt)/1000):0;o._gt=now;z=z||0;
  if(o._gp===undefined){o._gp=0;o._ga=0;o._mv=0;o._lx=x;o._lz=z}const d=Math.hypot(x-o._lx,z-o._lz);o._lx=x;o._lz=z;
  if(ok&&d>.12&&d<40)o._mv=.1;else o._mv-=dt;const mv=o._mv>0;
- o._ga+=((mv?1:0)-o._ga)*Math.min(1,dt*10);if(mv&&d<40)o._gp+=d/26*PI;else if(!mv&&o._ga<.03){o._ga=0;o._gp=Math.round(o._gp/PI)*PI}
+ o._ga+=((mv?1:0)-o._ga)*Math.min(1,dt*10);if(mv&&d<40){const v=dt>0?d/dt:0;o._gp+=dt>0?PI*dt*(v<=45?v/26:Math.min(3,1.73+(v-45)*.009)):d/26*PI}/* cadence (arm check, Oct 30 2026): ~1.75-2 steps/s walking, up to ~3 at a run (was distance/26, ~3 steps/s at a walk) */else if(!mv&&o._ga<.03){o._ga=0;o._gp=Math.round(o._gp/PI)*PI}
  return[o._gp,o._ga]}
 // --- a cartoon adult, front view, feet at (x,y), s = px per world unit ---
 function drawPerson(x,y,s,L,o={}){const f=o.face||1,sq=CL(o.squat||0,0,1),bw=11*L.body,lean=o.lean||0,bob=o.bob||0;
@@ -247,7 +247,8 @@ function drawPerson(x,y,s,L,o={}){const f=o.face||1,sq=CL(o.squat||0,0,1),bw=11*
   else if(ap==='back'){ex=sd*(tw+5)-f*3;ey=sy+9;hx2=sd*(tw+3)-f*8;hy2=sy+17}
   else if(ap==='hold'){ex=sd*(tw+3)+f*4;ey=sy+9;hx2=f*(tw*.6+5);hy2=sy+13}
   else if(ap==='raise'){ex=sd*(tw+3)+f*2;ey=sy-2;hx2=f*(tw*.3+4);hy2=sy-12}
-  else{ex=sd*(tw+4);ey=sy+10;hx2=sd*(tw+3.5);hy2=sy+20}
+  else{/* arm check (Oct 30 2026): walking arms swing opposite the legs on the same stride phase - the forward arm's elbow flares and the forearm bends up, the back arm hangs straight; eases to hanging */
+   const v=-Math.sin(gp+(sd>0?0:PI))*ga,fw=Math.max(0,v),bk=Math.max(0,-v);ex=sd*(tw+4+fw*2.8);ey=sy+10-fw*1.5;hx2=sd*(tw+3.5-fw*2.5+bk*1.2)+f*fw*1.5;hy2=sy+20-fw*7.5}
   limb(sx,sy,ex,ey,hx2,hy2,L.skin,4.4);limb(sx,sy,lerp(sx,ex,.6),lerp(sy,ey,.6),lerp(sx,ex,.62),lerp(sy,ey,.62),sl,5.6);ell(hx2,hy2,2.6,2.6,L.skin)}
  o.hands=[f*(tw*.6+5)+hx,0];
  // head
